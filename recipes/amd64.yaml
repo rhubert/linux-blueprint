@@ -1,0 +1,75 @@
+inherit: [ "basement::rootrecipe" ]
+
+environment:
+    LINUX_CUSTOM_CONFIG: x86_64.defconfig
+
+packageDepends: True
+packageScript: |
+    cp ${BOB_DEP_PATHS[rootfs]}/rootfs.img .
+    cp ${BOB_DEP_PATHS[kernel::linux-image]}/bzImage .
+
+multiPackage:
+    glibc:
+        multiPackage:
+            systemd-wayland:
+                environment:
+                    CONFIG_INIT: systemd
+                    BLUEPRINT_GRAPHICS_PLATFORM: wayland
+            systemd-x11:
+                environment:
+                    CONFIG_INIT: systemd
+                    BLUEPRINT_GRAPHICS_PLATFORM: x11
+            busybox-wayland:
+                environment:
+                    CONFIG_INIT: sysvinit/busybox
+                    BLUEPRINT_GRAPHICS_PLATFORM: wayland
+            busybox-x11:
+                environment:
+                    CONFIG_INIT: sysvinit/busybox
+                    BLUEPRINT_GRAPHICS_PLATFORM: x11
+
+        depends:
+            - name: devel::cross-toolchain-x86_64-linux-gnu
+              use: [environment, tools]
+              forward: true
+
+            - rootfs
+            - kernel::linux-image
+
+        packageScript: |
+            cat >run.sh <<'EOF'
+            #!/bin/sh
+            cd "${0%/*}"
+            qemu-system-x86_64 -M q35 -cpu kvm64 -m 1024 \
+                -kernel bzImage -append "root=/dev/vda rw" \
+                -blockdev driver=file,node-name=hd0,filename=rootfs.img \
+                -device virtio-blk,drive=hd0 -device virtio-vga-gl -display gtk,gl=on "$@"
+            EOF
+            chmod a+x run.sh
+
+    uclibc:
+        environment:
+            CONFIG_INIT: "sysvinit/busybox"
+
+        depends:
+            - name: devel::cross-toolchain
+              use: [environment, tools]
+              forward: true
+              environment:
+                  AUTOCONF_TARGET: "x86_64-cross-linux-uclibc"
+                  ARCH: x86_64
+                  GCC_LIBC: uclibc-ng
+
+            - rootfs
+            - kernel::linux-image
+
+        packageScript: |
+            cat >run.sh <<'EOF'
+            #!/bin/sh
+            cd "${0%/*}"
+            qemu-system-x86_64 -M q35 -cpu kvm64 -m 1024 -nographic \
+                -kernel bzImage -append "console=ttyS0 root=/dev/vda rw" \
+                -blockdev driver=file,node-name=hd0,filename=rootfs.img \
+                -device virtio-blk,drive=hd0 "$@"
+            EOF
+            chmod a+x run.sh

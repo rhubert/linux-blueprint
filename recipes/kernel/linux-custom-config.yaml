@@ -1,0 +1,10 @@
+checkoutSCM:
+    scm: import
+    url: linux-custom-config
+    recipeRelative: True
+
+buildScript: |
+    rsync -a --delete "$1/" .
+
+packageScript: |
+    cp "$1"/* .
