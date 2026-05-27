@@ -1,4 +1,4 @@
-bobMinimumVersion: "1.1"
+bobMinimumVersion: "1.2"
 layers:
     - name: basement
       scm: git
