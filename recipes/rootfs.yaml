@@ -1,11 +1,3 @@
-inherit: ["rootfs::ext4"]
-
-environment:
-    MESA3D_PLATFORM: "${BLUEPRINT_GRAPHICS_PLATFORM:-none}"
-    CONFIG_ROOT_PW: "root"
-    UTIL_LINUX_SU: "1"
-    SYSTEMD_LOGIND: "1"
-
 # The 'Config' entries are parsed *after* 'environment'
 Config:
     CONFIG_INIT:
@@ -24,130 +16,150 @@ Config:
             none:
         default: none
 
-depends:
-    - tools:
-          target-toolchain: host-compat-toolchain
-      use: [tools]
-      depends:
-          - graphics::xorg::mkfontscale
+multiPackage:
+    files:
+        inherit: [sbom]
 
-    - core::rootfs-skel
-    - core::dbus
+        checkoutSCM:
+            scm: import
+            url: rootfs
+            recipeRelative: True
+        buildVars: [CONFIG_INIT]
+        buildScript: |
+            ln -snf $1/common
+            if [[ -d "$1/$CONFIG_INIT" ]] ; then
+                ln -snf $1/$CONFIG_INIT
+            fi
+        packageScript: |
+            rsync -aHK $1/common/ .
+            if [[ -e "$1/$(basename $CONFIG_INIT)" ]] ; then
+                rsync -aHK $1/$(basename ${CONFIG_INIT})/ .
+            fi
 
-    - if: "$(eq,$CONFIG_INIT,sysvinit/busybox)"
-      depends:
-          - core::busybox
-          - core::eudev
+    "":
+        inherit: ["rootfs::ext4"]
 
-    - if: "$(eq,$CONFIG_INIT,systemd)"
-      depends:
-          - core::coreutils
-          #- core::shadow
-          - core::systemd
-          - core::util-linux
-          - kernel::kmod
-          - utils::bc
-          - utils::bzip2
-          - utils::findutils
-          - utils::gawk
-          - utils::grep
-          - utils::gzip
-          - utils::sed
+        environment:
+            MESA3D_PLATFORM: "${BLUEPRINT_GRAPHICS_PLATFORM:-none}"
+            CONFIG_ROOT_PW: "root"
+            UTIL_LINUX_SU: "1"
+            SYSTEMD_LOGIND: "1"
 
-    - if: !expr |
-          "$BLUEPRINT_GRAPHICS_PLATFORM" == "x11"
-      depends:
-          - graphics::xorg::xserver
-          - graphics::xorg::xf86-input-evdev
-          - graphics::xorg::xf86-video-fbdev
+        privateEnvironment:
+            TARGET_ARCH: '$(get-tool-env,target-toolchain,ARCH,$ARCH)'
 
-          - graphics::xorg::setxkbmap
-          - graphics::xorg::xauth
-          - graphics::xorg::xinit
-          - graphics::xorg::xrdb
-          - graphics::xorg::xeyes
-          - graphics::xorg::xset
-          - graphics::xorg::xsetroot
-          - graphics::xorg::xterm
-          - graphics::xorg::twm
-          
-          - graphics::xorg::xcursor-themes
+        depends:
 
-          # Usually taken from util-linux
-          - name: graphics::xorg::mcookie
-            if: "$(eq,$CONFIG_INIT,sysvinit/busybox)"
+          - tools:
+                target-toolchain: host-compat-toolchain
+            use: [tools]
+            depends:
+                - graphics::xorg::mkfontscale
 
-    - if: !expr |
-          "$BLUEPRINT_GRAPHICS_PLATFORM" == "wayland"
-      depends:
-          - graphics::wayland::weston
+          - core::rootfs-skel
+          - core::dbus
 
-    - if: !expr |
-          "$BLUEPRINT_GRAPHICS_PLATFORM" != "none"
-      depends:
-          - graphics::fonts::dejavu
-          - graphics::fonts::unicode
-          - graphics::glmark2
+          - if: "$(eq,$CONFIG_INIT,sysvinit/busybox)"
+            depends:
+                - core::busybox
+                - core::eudev
 
-    - utils::file
-    - utils::bash
-    - utils::rsync
-    - utils::strace
+          - if: "$(eq,$CONFIG_INIT,systemd)"
+            depends:
+                - core::coreutils
+                #- core::shadow
+                - core::systemd
+                - core::util-linux
+                - kernel::kmod
+                - utils::bc
+                - utils::bzip2
+                - utils::findutils
+                - utils::gawk
+                - utils::grep
+                - utils::gzip
+                - utils::sed
 
-    - libs::libc-bin
-    - libs::libc-tgt
-    - libs::libc-stdc++-tgt
+          - if: !expr |
+                "$BLUEPRINT_GRAPHICS_PLATFORM" == "x11"
+            depends:
+                - graphics::xorg::xserver
+                - graphics::xorg::xf86-input-evdev
+                - graphics::xorg::xf86-video-fbdev
 
-    - kernel::linux-modules
+                - graphics::xorg::setxkbmap
+                - graphics::xorg::xauth
+                - graphics::xorg::xinit
+                - graphics::xorg::xrdb
+                - graphics::xorg::xeyes
+                - graphics::xorg::xset
+                - graphics::xorg::xsetroot
+                - graphics::xorg::xterm
+                - graphics::xorg::twm
 
-privateEnvironment:
-    TARGET_ARCH: '$(get-tool-env,target-toolchain,ARCH,$ARCH)'
+                - graphics::xorg::xcursor-themes
 
-checkoutSCM:
-    scm: import
-    url: rootfs
-    recipeRelative: True
+                # Usually taken from util-linux
+                - name: graphics::xorg::mcookie
+                  if: "$(eq,$CONFIG_INIT,sysvinit/busybox)"
 
-buildTools:
-    - name: mkfontdir
-      if: !expr |
-          "$BLUEPRINT_GRAPHICS_PLATFORM" == "x11"
-buildVars: [TARGET_ARCH, CONFIG_INIT, BLUEPRINT_GRAPHICS_PLATFORM]
-buildScript: |
-    rm -rf install
+          - if: !expr |
+                "$BLUEPRINT_GRAPHICS_PLATFORM" == "wayland"
+            depends:
+                - graphics::wayland::weston
 
-    SRC=( "$1/common" )
-    if [[ -d "$1/$CONFIG_INIT" ]] ; then
-        SRC+=( "$1/$CONFIG_INIT" )
-    fi
-    SRC+=( "${@:2}" )
+          - if: !expr |
+                "$BLUEPRINT_GRAPHICS_PLATFORM" != "none"
+            depends:
+                - graphics::fonts::dejavu
+                - graphics::fonts::unicode
+                - graphics::glmark2
 
-    rootfsCopy "$PWD/install" "${SRC[@]}"
-    rootfsPrepare "$PWD/install" "${SRC[@]}"
+          - utils::file
+          - utils::bash
+          - utils::rsync
+          - utils::strace
 
-    pushd install
+          - libs::libc-bin
+          - libs::libc-tgt
+          - libs::libc-stdc++-tgt
 
-    if [[ ! -e bin/sh ]] ; then
-        ln -sf bash bin/sh
-    fi
+          - kernel::linux-modules
 
-    # Enable serial console login by default
-    if [[ $TARGET_ARCH == x86_64 ]] ; then
-        if [[ $CONFIG_INIT == systemd ]] ; then
-            mkdir -p etc/systemd/system/getty.target.wants
-            ln -s /usr/lib/systemd/system/getty@.service etc/systemd/system/getty.target.wants/getty@ttyS0.service
-        else
-            echo "ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100" >> etc/inittab
-        fi
-    fi
+          - rootfs-files
+        buildTools:
+            - name: mkfontdir
+              if: !expr |
+                  "$BLUEPRINT_GRAPHICS_PLATFORM" == "x11"
+        buildVars: [TARGET_ARCH, CONFIG_INIT, BLUEPRINT_GRAPHICS_PLATFORM]
+        buildScript: |
+            rm -rf install
 
-    if [[ "$BLUEPRINT_GRAPHICS_PLATFORM" == x11 ]] ; then
-        mkfontdir usr/share/fonts/X11/misc/
-    fi
+            rootfsCopy "$PWD/install" "${@:2}"
+            rootfsPrepare "$PWD/install" "${@:2}"
 
-    popd
+            pushd install
 
-    rootfsExt4CreateImage "$PWD/install" "rootfs" "2.50%"
+            if [[ ! -e bin/sh ]] ; then
+                ln -sf bash bin/sh
+            fi
 
-packageScript: |
-    cp $1/rootfs.img .
+            # Enable serial console login by default
+            if [[ $TARGET_ARCH == x86_64 ]] ; then
+                if [[ $CONFIG_INIT == systemd ]] ; then
+                    mkdir -p etc/systemd/system/getty.target.wants
+                    ln -s /usr/lib/systemd/system/getty@.service etc/systemd/system/getty.target.wants/getty@ttyS0.service
+                else
+                    echo "ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100" >> etc/inittab
+                fi
+            fi
+
+            if [[ "$BLUEPRINT_GRAPHICS_PLATFORM" == x11 ]] ; then
+                mkfontdir usr/share/fonts/X11/misc/
+            fi
+
+            popd
+
+            rootfsExt4CreateImage "$PWD/install" "rootfs" "2.50%"
+
+        packageScript: |
+            cp $1/rootfs.img .
