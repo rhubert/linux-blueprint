@@ -37,7 +37,7 @@ multiPackage:
             fi
 
     "":
-        inherit: ["rootfs::ext4"]
+        inherit: ["rootfs::ext4", sbom]
 
         environment:
             MESA3D_PLATFORM: "${BLUEPRINT_GRAPHICS_PLATFORM:-none}"

@@ -1,4 +1,4 @@
-inherit: [ "basement::rootrecipe" ]
+inherit: [ "basement::rootrecipe", "sbom-deploy" ]
 
 environment:
     LINUX_CUSTOM_CONFIG: x86_64.defconfig
@@ -7,6 +7,9 @@ packageDepends: True
 packageScript: |
     cp ${BOB_DEP_PATHS[rootfs]}/rootfs.img .
     cp ${BOB_DEP_PATHS[kernel::linux-image]}/bzImage .
+
+    sbomDeploy -n rootfs.img ${BOB_DEP_PATHS[rootfs]}
+    sbomDeploy -n bzImage ${BOB_DEP_PATHS[kernel::linux-image]}
 
 multiPackage:
     glibc:
